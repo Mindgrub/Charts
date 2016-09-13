@@ -2,6 +2,8 @@
 //  LineRadarChartDataSet.swift
 //  Charts
 //
+//  Created by Daniel Cohen Gindi on 26/2/15.
+//
 //  Copyright 2015 Daniel Cohen Gindi & Philipp Jahoda
 //  A port of MPAndroidChart for iOS
 //  Licensed under Apache License 2.0
@@ -35,7 +37,7 @@ public class LineRadarChartDataSet: LineScatterCandleRadarChartDataSet, ILineRad
     
     /// The object that is used for filling the area below the line.
     /// **default**: nil
-    public var fill: Fill?
+    public var fill: ChartFill?
     
     /// The alpha value that is used for filling the line surface,
     /// **default**: 0.33
@@ -69,12 +71,12 @@ public class LineRadarChartDataSet: LineScatterCandleRadarChartDataSet, ILineRad
         }
     }
     
-    /// Set to `true` if the DataSet should be drawn filled (surface), and not just as a line.
+    /// Set to true if the DataSet should be drawn filled (surface), and not just as a line.
     /// Disabling this will give great performance boost.
     /// Please note that this method uses the path clipping for drawing the filled area (with images, gradients and layers).
     public var drawFilledEnabled = false
     
-    /// - returns: `true` if filled drawing is enabled, `false` ifnot
+    /// Returns true if filled drawing is enabled, false if not
     public var isDrawFilledEnabled: Bool
     {
         return drawFilledEnabled

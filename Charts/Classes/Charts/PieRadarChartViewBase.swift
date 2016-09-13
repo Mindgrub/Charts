@@ -2,6 +2,8 @@
 //  PieRadarChartViewBase.swift
 //  Charts
 //
+//  Created by Daniel Cohen Gindi on 4/3/15.
+//
 //  Copyright 2015 Daniel Cohen Gindi & Philipp Jahoda
 //  A port of MPAndroidChart for iOS
 //  Licensed under Apache License 2.0
@@ -58,12 +60,12 @@ public class PieRadarChartViewBase: ChartViewBase
     {
         super.initialize()
         
-        _tapGestureRecognizer = NSUITapGestureRecognizer(target: self, action: #selector(tapGestureRecognized(_:)))
+        _tapGestureRecognizer = NSUITapGestureRecognizer(target: self, action: #selector(PieRadarChartViewBase.tapGestureRecognized(_:)))
         
         self.addGestureRecognizer(_tapGestureRecognizer)
 
         #if !os(tvOS)
-            _rotationGestureRecognizer = NSUIRotationGestureRecognizer(target: self, action: #selector(rotationGestureRecognized(_:)))
+            _rotationGestureRecognizer = NSUIRotationGestureRecognizer(target: self, action: #selector(PieRadarChartViewBase.rotationGestureRecognized(_:)))
             self.addGestureRecognizer(_rotationGestureRecognizer)
             _rotationGestureRecognizer.enabled = rotationWithTwoFingers
         #endif
@@ -71,15 +73,7 @@ public class PieRadarChartViewBase: ChartViewBase
     
     internal override func calcMinMax()
     {
-        /*_xAxis.axisRange = Double((_data?.xVals.count ?? 0) - 1)*/
-    }
-    
-    public override var maxVisibleCount: Int
-    {
-        get
-        {
-            return data?.entryCount ?? 0
-        }
+        _xAxis.axisRange = Double((_data?.xVals.count ?? 0) - 1)
     }
     
     public override func notifyDataSetChanged()
@@ -105,7 +99,8 @@ public class PieRadarChartViewBase: ChartViewBase
 
         if _legend != nil && _legend.enabled && !_legend.drawInside
         {
-            let fullLegendWidth = min(_legend.neededWidth, _viewPortHandler.chartWidth * _legend.maxSizePercent)
+            var fullLegendWidth = min(_legend.neededWidth, _viewPortHandler.chartWidth * _legend.maxSizePercent)
+            fullLegendWidth += _legend.formSize + _legend.formToTextSpace
             
             switch _legend.orientation
             {
@@ -244,7 +239,7 @@ public class PieRadarChartViewBase: ChartViewBase
         _viewPortHandler.restrainViewPort(offsetLeft: offsetLeft, offsetTop: offsetTop, offsetRight: offsetRight, offsetBottom: offsetBottom)
     }
 
-    /// - returns: The angle relative to the chart center for the given point on the chart in degrees.
+    /// - returns: the angle relative to the chart center for the given point on the chart in degrees.
     /// The angle is always between 0 and 360°, 0° is NORTH, 90° is EAST, ...
     public func angleForPoint(x x: CGFloat, y: CGFloat) -> CGFloat
     {
@@ -276,13 +271,13 @@ public class PieRadarChartViewBase: ChartViewBase
     
     /// Calculates the position around a center point, depending on the distance
     /// from the center, and the angle of the position around the center.
-    public func getPosition(center center: CGPoint, dist: CGFloat, angle: CGFloat) -> CGPoint
+    internal func getPosition(center center: CGPoint, dist: CGFloat, angle: CGFloat) -> CGPoint
     {
         return CGPoint(x: center.x + dist * cos(angle * ChartUtils.Math.FDEG2RAD),
                 y: center.y + dist * sin(angle * ChartUtils.Math.FDEG2RAD))
     }
 
-    /// - returns: The distance of a certain point on the chart to the center of the chart.
+    /// - returns: the distance of a certain point on the chart to the center of the chart.
     public func distanceToCenter(x x: CGFloat, y: CGFloat) -> CGFloat
     {
         let c = self.centerOffsets
@@ -316,7 +311,7 @@ public class PieRadarChartViewBase: ChartViewBase
         return dist
     }
 
-    /// - returns: The xIndex for the given angle around the center of the chart.
+    /// - returns: the xIndex for the given angle around the center of the chart.
     /// -1 if not found / outofbounds.
     public func indexForAngle(angle: CGFloat) -> Int
     {
@@ -326,7 +321,7 @@ public class PieRadarChartViewBase: ChartViewBase
     /// current rotation angle of the pie chart
     ///
     /// **default**: 270 --> top (NORTH)
-    /// - returns: Will always return a normalized value, which will be between 0.0 < 360.0
+    /// - returns: will always return a normalized value, which will be between 0.0 < 360.0
     public var rotationAngle: CGFloat
     {
         get
@@ -348,7 +343,7 @@ public class PieRadarChartViewBase: ChartViewBase
         return _rawRotationAngle
     }
 
-    /// - returns: The diameter of the pie- or radar-chart
+    /// - returns: the diameter of the pie- or radar-chart
     public var diameter: CGFloat
     {
         var content = _viewPortHandler.contentRect
@@ -359,19 +354,19 @@ public class PieRadarChartViewBase: ChartViewBase
         return min(content.width, content.height)
     }
 
-    /// - returns: The radius of the chart in pixels.
+    /// - returns: the radius of the chart in pixels.
     public var radius: CGFloat
     {
         fatalError("radius cannot be called on PieRadarChartViewBase")
     }
 
-    /// - returns: The required offset for the chart legend.
+    /// - returns: the required offset for the chart legend.
     internal var requiredLegendOffset: CGFloat
     {
         fatalError("requiredLegendOffset cannot be called on PieRadarChartViewBase")
     }
 
-    /// - returns: The base offset needed for the chart without calculating the
+    /// - returns: the base offset needed for the chart without calculating the
     /// legend size.
     internal var requiredBaseOffset: CGFloat
     {
@@ -386,6 +381,36 @@ public class PieRadarChartViewBase: ChartViewBase
     public override var chartYMin: Double
     {
         return 0.0
+    }
+    
+    /// The SelectionDetail objects give information about the value at the selected index and the DataSet it belongs to.
+    /// - returns: an array of SelectionDetail objects for the given x-index.
+    public func getSelectionDetailsAtIndex(xIndex: Int) -> [ChartSelectionDetail]
+    {
+        var vals = [ChartSelectionDetail]()
+        
+        guard let data = _data else { return vals }
+
+        for i in 0 ..< data.dataSetCount
+        {
+            guard let dataSet = data.getDataSetByIndex(i) else { continue }
+            
+            if !dataSet.isHighlightEnabled
+            {
+                continue
+            }
+            
+            // extract all y-values from all DataSets at the given x-index
+            let yVal = dataSet.yValForXIndex(xIndex)
+            if (yVal.isNaN)
+            {
+                continue
+            }
+            
+            vals.append(ChartSelectionDetail(value: yVal, dataSetIndex: i, dataSet: dataSet))
+        }
+        
+        return vals
     }
     
     public var isRotationEnabled: Bool { return rotationEnabled; }
@@ -426,7 +451,7 @@ public class PieRadarChartViewBase: ChartViewBase
     
     // MARK: - Animation
     
-    private var _spinAnimator: Animator!
+    private var _spinAnimator: ChartAnimator!
     
     /// Applys a spin animation to the Chart.
     public func spin(duration duration: NSTimeInterval, fromAngle: CGFloat, toAngle: CGFloat, easing: ChartEasingFunctionBlock?)
@@ -436,9 +461,9 @@ public class PieRadarChartViewBase: ChartViewBase
             _spinAnimator.stop()
         }
         
-        _spinAnimator = Animator()
+        _spinAnimator = ChartAnimator()
         _spinAnimator.updateBlock = {
-            self.rotationAngle = (toAngle - fromAngle) * CGFloat(self._spinAnimator.phaseX) + fromAngle
+            self.rotationAngle = (toAngle - fromAngle) * self._spinAnimator.phaseX + fromAngle
         }
         _spinAnimator.stopBlock = { self._spinAnimator = nil; }
         
@@ -801,7 +826,7 @@ public class PieRadarChartViewBase: ChartViewBase
         }
     }
     
-    /// - returns: The distance between two points
+    /// - returns: the distance between two points
     private func distance(eventX eventX: CGFloat, startX: CGFloat, eventY: CGFloat, startY: CGFloat) -> CGFloat
     {
         let dx = eventX - startX
@@ -809,7 +834,7 @@ public class PieRadarChartViewBase: ChartViewBase
         return sqrt(dx * dx + dy * dy)
     }
     
-    /// - returns: The distance between two points
+    /// - returns: the distance between two points
     private func distance(from from: CGPoint, to: CGPoint) -> CGFloat
     {
         let dx = from.x - to.x
@@ -818,7 +843,7 @@ public class PieRadarChartViewBase: ChartViewBase
     }
     
     /// reference to the last highlighted object
-    private var _lastHighlight: Highlight!
+    private var _lastHighlight: ChartHighlight!
     
     @objc private func tapGestureRecognized(recognizer: NSUITapGestureRecognizer)
     {
@@ -827,9 +852,76 @@ public class PieRadarChartViewBase: ChartViewBase
             if !self.isHighLightPerTapEnabled { return }
             
             let location = recognizer.locationInView(self)
+            let distance = distanceToCenter(x: location.x, y: location.y)
             
-            let high = self.getHighlightByTouchPoint(location)
-            self.highlightValue(high)
+            // check if a slice was touched
+            if (distance > self.radius)
+            {
+                // if no slice was touched, highlight nothing
+                self.highlightValues(nil)
+                
+                if _lastHighlight == nil
+                {
+                    self.highlightValues(nil) // do not call delegate
+                }
+                else
+                {
+                    self.highlightValue(highlight: nil, callDelegate: true) // call delegate
+                }
+                
+                _lastHighlight = nil
+            }
+            else
+            {
+                var angle = angleForPoint(x: location.x, y: location.y)
+                
+                if (self.isKindOfClass(PieChartView))
+                {
+                    angle /= _animator.phaseY
+                }
+                
+                let index = indexForAngle(angle)
+                
+                // check if the index could be found
+                if (index < 0)
+                {
+                    self.highlightValues(nil)
+                    _lastHighlight = nil
+                }
+                else
+                {
+                    let valsAtIndex = getSelectionDetailsAtIndex(index)
+                    
+                    var dataSetIndex = 0
+                    
+                    // get the dataset that is closest to the selection (PieChart only has one DataSet)
+                    if (self.isKindOfClass(RadarChartView))
+                    {
+                        dataSetIndex = ChartUtils.closestDataSetIndexByValue(valsAtIndex: valsAtIndex, value: Double(distance / (self as! RadarChartView).factor), axis: nil) ?? -1
+                    }
+                    
+                    if (dataSetIndex < 0)
+                    {
+                        self.highlightValues(nil)
+                        _lastHighlight = nil
+                    }
+                    else
+                    {
+                        let h = ChartHighlight(xIndex: index, dataSetIndex: dataSetIndex)
+                        
+                        if (_lastHighlight !== nil && h == _lastHighlight)
+                        {
+                            self.highlightValue(highlight: nil, callDelegate: true)
+                            _lastHighlight = nil
+                        }
+                        else
+                        {
+                            self.highlightValue(highlight: h, callDelegate: true)
+                            _lastHighlight = h
+                        }
+                    }
+                }
+            }
         }
     }
     

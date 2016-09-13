@@ -16,7 +16,7 @@ import CoreGraphics
     import UIKit
 #endif
 
-public class AnimatedViewPortJob: ViewPortJob
+public class AnimatedViewPortJob: ChartViewPortJob
 {
     internal var phase: CGFloat = 1.0
     internal var xOrigin: CGFloat = 0.0
@@ -30,10 +30,10 @@ public class AnimatedViewPortJob: ViewPortJob
     private var _easing: ChartEasingFunctionBlock?
     
     public init(
-        viewPortHandler: ViewPortHandler,
-        xValue: Double,
+        viewPortHandler: ChartViewPortHandler,
+        xIndex: CGFloat,
         yValue: Double,
-        transformer: Transformer,
+        transformer: ChartTransformer,
         view: ChartViewBase,
         xOrigin: CGFloat,
         yOrigin: CGFloat,
@@ -41,7 +41,7 @@ public class AnimatedViewPortJob: ViewPortJob
         easing: ChartEasingFunctionBlock?)
     {
         super.init(viewPortHandler: viewPortHandler,
-            xValue: xValue,
+            xIndex: xIndex,
             yValue: yValue,
             transformer: transformer,
             view: view)
@@ -70,7 +70,7 @@ public class AnimatedViewPortJob: ViewPortJob
         
         updateAnimationPhase(_startTime)
         
-        _displayLink = NSUIDisplayLink(target: self, selector: #selector(animationLoop))
+        _displayLink = NSUIDisplayLink(target: self, selector: #selector(AnimatedViewPortJob.animationLoop))
         _displayLink.addToRunLoop(NSRunLoop.mainRunLoop(), forMode: NSRunLoopCommonModes)
     }
     
@@ -108,7 +108,7 @@ public class AnimatedViewPortJob: ViewPortJob
         
         if _easing != nil
         {
-            phase = CGFloat(_easing!(elapsed: elapsed, duration: duration))
+            phase = _easing!(elapsed: elapsed, duration: duration)
         }
         else
         {

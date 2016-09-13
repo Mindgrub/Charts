@@ -2,6 +2,9 @@
 //  Utils.swift
 //  Charts
 //
+//  Created by Daniel Cohen Gindi on 23/2/15.
+
+//
 //  Copyright 2015 Daniel Cohen Gindi & Philipp Jahoda
 //  A port of MPAndroidChart for iOS
 //  Licensed under Apache License 2.0
@@ -18,7 +21,7 @@ import CoreGraphics
 
 public class ChartUtils
 {
-    private static var _defaultValueFormatter: IValueFormatter = ChartUtils.generateDefaultValueFormatter()
+    private static var _defaultValueFormatter: NSNumberFormatter = ChartUtils.generateDefaultValueFormatter()
     
     internal struct Math
     {
@@ -63,6 +66,103 @@ public class ChartUtils
         {
             return number + DBL_EPSILON
         }
+    }
+    
+    /// - returns: the index of the DataSet that contains the closest value on the y-axis
+    internal class func closestDataSetIndexByPixelY(
+        valsAtIndex valsAtIndex: [ChartSelectionDetail],
+                    y: CGFloat,
+                    axis: ChartYAxis.AxisDependency?) -> Int?
+    {
+        return closestSelectionDetailByPixelY(valsAtIndex: valsAtIndex, y: y, axis: axis)?.dataSetIndex
+    }
+    
+    /// - returns: the index of the DataSet that contains the closest value on the y-axis
+    internal class func closestDataSetIndexByValue(
+        valsAtIndex valsAtIndex: [ChartSelectionDetail],
+                    value: Double,
+                    axis: ChartYAxis.AxisDependency?) -> Int?
+    {
+        return closestSelectionDetailByValue(valsAtIndex: valsAtIndex, value: value, axis: axis)?.dataSetIndex
+    }
+    
+    /// - returns: the `ChartSelectionDetail` of the closest value on the y-axis
+    internal class func closestSelectionDetailByPixelY(
+        valsAtIndex valsAtIndex: [ChartSelectionDetail],
+                    y: CGFloat,
+                    axis: ChartYAxis.AxisDependency?) -> ChartSelectionDetail?
+    {
+        var distance = CGFloat.max
+        var detail: ChartSelectionDetail?
+        
+        for i in 0 ..< valsAtIndex.count
+        {
+            let sel = valsAtIndex[i]
+            
+            if (axis == nil || sel.dataSet?.axisDependency == axis)
+            {
+                let cdistance = abs(sel.y - y)
+                if (cdistance < distance)
+                {
+                    detail = sel
+                    distance = cdistance
+                }
+            }
+        }
+        
+        return detail
+    }
+    
+    /// - returns: the `ChartSelectionDetail` of the closest value on the y-axis
+    internal class func closestSelectionDetailByValue(
+        valsAtIndex valsAtIndex: [ChartSelectionDetail],
+                    value: Double,
+                    axis: ChartYAxis.AxisDependency?) -> ChartSelectionDetail?
+    {
+        var distance = DBL_MAX
+        var detail: ChartSelectionDetail?
+        
+        for i in 0 ..< valsAtIndex.count
+        {
+            let sel = valsAtIndex[i]
+            
+            if (axis == nil || sel.dataSet?.axisDependency == axis)
+            {
+                let cdistance = abs(sel.value - value)
+                if (cdistance < distance)
+                {
+                    detail = sel
+                    distance = cdistance
+                }
+            }
+        }
+        
+        return detail
+    }
+    
+    /// - returns: the minimum distance from a touch-y-value (in pixels) to the closest y-value (in pixels) that is displayed in the chart.
+    internal class func getMinimumDistance(
+        valsAtIndex: [ChartSelectionDetail],
+        y: CGFloat,
+        axis: ChartYAxis.AxisDependency) -> CGFloat
+    {
+        var distance = CGFloat.max
+        
+        for i in 0 ..< valsAtIndex.count
+        {
+            let sel = valsAtIndex[i]
+            
+            if (sel.dataSet!.axisDependency == axis)
+            {
+                let cdistance = abs(sel.y - y)
+                if (cdistance < distance)
+                {
+                    distance = cdistance
+                }
+            }
+        }
+        
+        return distance
     }
     
     /// Calculates the position around a center point, depending on the distance from the center, and the angle of the position around the center.
@@ -200,7 +300,7 @@ public class ChartUtils
         drawMultilineText(context: context, text: text, knownTextSize: rect.size, point: point, attributes: attributes, constrainedToSize: constrainedToSize, anchor: anchor, angleRadians: angleRadians)
     }
     
-    /// - returns: An angle between 0.0 < 360.0 (not less than zero, less than 360)
+    /// - returns: an angle between 0.0 < 360.0 (not less than zero, less than 360)
     internal class func normalizedAngleFromAngle(angle: CGFloat) -> CGFloat
     {
         var angle = angle
@@ -213,14 +313,18 @@ public class ChartUtils
         return angle % 360.0
     }
     
-    private class func generateDefaultValueFormatter() -> IValueFormatter
+    private class func generateDefaultValueFormatter() -> NSNumberFormatter
     {
-        let formatter = DefaultValueFormatter(decimals: 1)
+        let formatter = NSNumberFormatter()
+        formatter.minimumIntegerDigits = 1
+        formatter.maximumFractionDigits = 1
+        formatter.minimumFractionDigits = 1
+        formatter.usesGroupingSeparator = true
         return formatter
     }
     
-    /// - returns: The default value formatter used for all chart components that needs a default
-    public class func defaultValueFormatter() -> IValueFormatter
+    /// - returns: the default value formatter used for all chart components that needs a default
+    internal class func defaultValueFormatter() -> NSNumberFormatter
     {
         return _defaultValueFormatter
     }

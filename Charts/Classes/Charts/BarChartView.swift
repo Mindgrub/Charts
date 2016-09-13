@@ -2,6 +2,8 @@
 //  BarChartView.swift
 //  Charts
 //
+//  Created by Daniel Cohen Gindi on 4/3/15.
+//
 //  Copyright 2015 Daniel Cohen Gindi & Philipp Jahoda
 //  A port of MPAndroidChart for iOS
 //  Licensed under Apache License 2.0
@@ -15,6 +17,9 @@ import CoreGraphics
 /// Chart that draws bars.
 public class BarChartView: BarLineChartViewBase, BarChartDataProvider
 {
+    /// flag that enables or disables the highlighting arrow
+    private var _drawHighlightArrowEnabled = false
+    
     /// if set to true, all values are drawn above their bars, instead of below their top
     private var _drawValueAboveBarEnabled = true
 
@@ -26,37 +31,34 @@ public class BarChartView: BarLineChartViewBase, BarChartDataProvider
         super.initialize()
         
         renderer = BarChartRenderer(dataProvider: self, animator: _animator, viewPortHandler: _viewPortHandler)
+        _xAxisRenderer = ChartXAxisRendererBarChart(viewPortHandler: _viewPortHandler, xAxis: _xAxis, transformer: _leftAxisTransformer, chart: self)
         
-        self.highlighter = BarHighlighter(chart: self)
+        self.highlighter = BarChartHighlighter(chart: self)
+        
+        _xAxis._axisMinimum = -0.5
     }
     
     internal override func calcMinMax()
     {
-        guard let data = self.data as? BarChartData
-            else { return }
+        super.calcMinMax()
         
-        if fitBars
-        {
-            _xAxis.calculate(
-                min: data.xMin - data.barWidth / 2.0,
-                max: data.xMax - data.barWidth / 2.0)
-        }
-        else
-        {
-            _xAxis.calculate(min: data.xMin, max: data.xMax)
-        }
+        guard let data = _data else { return }
         
-        // calculate axis range (min / max) according to provided data
-        _leftAxis.calculate(
-            min: data.getYMin(.Left),
-            max: data.getYMax(.Left))
-        _rightAxis.calculate(
-            min: data.getYMin(.Right),
-            max: data.getYMax(.Right))
+        let barData = data as! BarChartData
+        
+        // increase deltax by 1 because the bars have a width of 1
+        _xAxis.axisRange += 0.5
+        
+        // extend xDelta to make space for multiple datasets (if ther are one)
+        _xAxis.axisRange *= Double(data.dataSetCount)
+        
+        let groupSpace = barData.groupSpace
+        _xAxis.axisRange += Double(barData.xValCount) * Double(groupSpace)
+        _xAxis._axisMaximum = _xAxis.axisRange - _xAxis._axisMinimum
     }
     
-    /// - returns: The Highlight object (contains x-index and DataSet index) of the selected value at the given touch point inside the BarChart.
-    public override func getHighlightByTouchPoint(pt: CGPoint) -> Highlight?
+    /// - returns: the Highlight object (contains x-index and DataSet index) of the selected value at the given touch point inside the BarChart.
+    public override func getHighlightByTouchPoint(pt: CGPoint) -> ChartHighlight?
     {
         if _data === nil
         {
@@ -67,21 +69,22 @@ public class BarChartView: BarLineChartViewBase, BarChartDataProvider
         return self.highlighter?.getHighlight(x: pt.x, y: pt.y)
     }
         
-    /// - returns: The bounding box of the specified Entry in the specified DataSet. Returns null if the Entry could not be found in the charts data.
+    /// - returns: the bounding box of the specified Entry in the specified DataSet. Returns null if the Entry could not be found in the charts data.
     public func getBarBounds(e: BarChartDataEntry) -> CGRect
     {
         guard let
-            data = _data as? BarChartData,
-            set = data.getDataSetForEntry(e) as? IBarChartDataSet
+            set = _data?.getDataSetForEntry(e) as? IBarChartDataSet
             else { return CGRectNull }
         
-        let y = e.y
-        let x = e.x
+        let barspace = set.barSpace
+        let y = CGFloat(e.value)
+        let x = CGFloat(e.xIndex)
         
-        let barWidth = data.barWidth
+        let barWidth: CGFloat = 0.5
         
-        let left = x - barWidth / 2.0
-        let right = x + barWidth / 2.0
+        let spaceHalf = barspace / 2.0
+        let left = x - barWidth + spaceHalf
+        let right = x + barWidth - spaceHalf
         let top = y >= 0.0 ? y : 0.0
         let bottom = y <= 0.0 ? y : 0.0
         
@@ -92,36 +95,40 @@ public class BarChartView: BarLineChartViewBase, BarChartDataProvider
         return bounds
     }
     
-    /// Groups all BarDataSet objects this data object holds together by modifying the x-value of their entries.
-    /// Previously set x-values of entries will be overwritten. Leaves space between bars and groups as specified by the parameters.
-    /// Calls `notifyDataSetChanged()` afterwards.
-    ///
-    /// - parameter fromX: the starting point on the x-axis where the grouping should begin
-    /// - parameter groupSpace: the space between groups of bars in values (not pixels) e.g. 0.8f for bar width 1f
-    /// - parameter barSpace: the space between individual bars in values (not pixels) e.g. 0.1f for bar width 1f
-    public func groupBars(fromX fromX: Double, groupSpace: Double, barSpace: Double)
+    public override var lowestVisibleXIndex: Int
     {
-        guard let barData = self.barData
-            else
-        {
-            Swift.print("You need to set data for the chart before grouping bars.", terminator: "\n")
-            return
-        }
+        let step = CGFloat(_data?.dataSetCount ?? 0)
+        let div = (step <= 1.0) ? 1.0 : step + (_data as! BarChartData).groupSpace
         
-        barData.groupBars(fromX: fromX, groupSpace: groupSpace, barSpace: barSpace)
-        notifyDataSetChanged()
+        var pt = CGPoint(x: _viewPortHandler.contentLeft, y: _viewPortHandler.contentBottom)
+        getTransformer(ChartYAxis.AxisDependency.Left).pixelToValue(&pt)
+        
+        return Int((pt.x <= CGFloat(chartXMin)) ? 0.0 : (pt.x / div) + 1.0)
     }
-    
-    /// Highlights the value at the given x-value in the given DataSet. Provide -1 as the dataSetIndex to undo all highlighting.
-    /// - parameter x:
-    /// - parameter dataSetIndex:
-    /// - parameter stackIndex: the index inside the stack - only relevant for stacked entries
-    public func highlightValue(x x: Double, dataSetIndex: Int, stackIndex: Int)
+
+    public override var highestVisibleXIndex: Int
     {
-        highlightValue(Highlight(x: x, dataSetIndex: dataSetIndex, stackIndex: stackIndex))
+        let step = CGFloat(_data?.dataSetCount ?? 0)
+        let div = (step <= 1.0) ? 1.0 : step + (_data as! BarChartData).groupSpace
+        
+        var pt = CGPoint(x: _viewPortHandler.contentRight, y: _viewPortHandler.contentBottom)
+        getTransformer(ChartYAxis.AxisDependency.Left).pixelToValue(&pt)
+        
+        return Int((pt.x >= CGFloat(chartXMax)) ? CGFloat(chartXMax) / div : (pt.x / div))
     }
 
     // MARK: Accessors
+    
+    /// flag that enables or disables the highlighting arrow
+    public var drawHighlightArrowEnabled: Bool
+    {
+        get { return _drawHighlightArrowEnabled; }
+        set
+        {
+            _drawHighlightArrowEnabled = newValue
+            setNeedsDisplay()
+        }
+    }
     
     /// if set to true, all values are drawn above their bars, instead of below their top
     public var drawValueAboveBarEnabled: Bool
@@ -145,24 +152,16 @@ public class BarChartView: BarLineChartViewBase, BarChartDataProvider
         }
     }
     
-    /// Adds half of the bar width to each side of the x-axis range in order to allow the bars of the barchart to be fully displayed.
-    /// **default**: false
-    public var fitBars = false
-    
-    /// Set this to `true` to make the highlight operation full-bar oriented, `false` to make it highlight single values (relevant only for stacked).
-    /// If enabled, highlighting operations will highlight the whole bar, even if only a single stack entry was tapped.
-    public var highlightFullBarEnabled: Bool = false
-    
-    /// - returns: `true` the highlight is be full-bar oriented, `false` ifsingle-value
-    public var isHighlightFullBarEnabled: Bool { return highlightFullBarEnabled }
-    
     // MARK: - BarChartDataProbider
     
     public var barData: BarChartData? { return _data as? BarChartData }
     
-    /// - returns: `true` if drawing values above bars is enabled, `false` ifnot
+    /// - returns: true if drawing the highlighting arrow is enabled, false if not
+    public var isDrawHighlightArrowEnabled: Bool { return drawHighlightArrowEnabled }
+    
+    /// - returns: true if drawing values above bars is enabled, false if not
     public var isDrawValueAboveBarEnabled: Bool { return drawValueAboveBarEnabled }
     
-    /// - returns: `true` if drawing shadows (maxvalue) for each bar is enabled, `false` ifnot
+    /// - returns: true if drawing shadows (maxvalue) for each bar is enabled, false if not
     public var isDrawBarShadowEnabled: Bool { return drawBarShadowEnabled }
 }

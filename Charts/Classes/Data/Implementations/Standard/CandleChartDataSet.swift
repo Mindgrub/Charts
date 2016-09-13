@@ -2,6 +2,8 @@
 //  CandleChartDataSet.swift
 //  Charts
 //
+//  Created by Daniel Cohen Gindi on 4/3/15.
+//
 //  Copyright 2015 Daniel Cohen Gindi & Philipp Jahoda
 //  A port of MPAndroidChart for iOS
 //  Licensed under Apache License 2.0
@@ -21,29 +23,55 @@ public class CandleChartDataSet: LineScatterCandleRadarChartDataSet, ICandleChar
         super.init()
     }
     
-    public override init(values: [ChartDataEntry]?, label: String?)
+    public override init(yVals: [ChartDataEntry]?, label: String?)
     {
-        super.init(values: values, label: label)
+        super.init(yVals: yVals, label: label)
     }
     
     // MARK: - Data functions and accessors
     
-    public override func calcMinMax(entry e: ChartDataEntry)
+    public override func calcMinMax(start start: Int, end: Int)
     {
-        guard let e = e as? CandleChartDataEntry
-            else { return }
+        let yValCount = self.entryCount
         
-        if (e.low < _yMin)
+        if yValCount == 0
         {
-            _yMin = e.low
+            return
         }
         
-        if (e.high > _yMax)
+        var entries = yVals as! [CandleChartDataEntry]
+        
+        var endValue : Int
+        
+        if end == 0 || end >= yValCount
         {
-            _yMax = e.high
+            endValue = yValCount - 1
+        }
+        else
+        {
+            endValue = end
         }
         
-        calcMinMaxX(entry: e)
+        _lastStart = start
+        _lastEnd = end
+        
+        _yMin = DBL_MAX
+        _yMax = -DBL_MAX
+        
+        for i in start.stride(through: endValue, by: 1)
+        {
+            let e = entries[i]
+            
+            if (e.low < _yMin)
+            {
+                _yMin = e.low
+            }
+            
+            if (e.high > _yMax)
+            {
+                _yMax = e.high
+            }
+        }
     }
     
     // MARK: - Styling functions and accessors

@@ -2,6 +2,9 @@
 //  PieChartDataSet.swift
 //  Charts
 //
+//  Created by Daniel Cohen Gindi on 24/2/15.
+
+//
 //  Copyright 2015 Daniel Cohen Gindi & Philipp Jahoda
 //  A port of MPAndroidChart for iOS
 //  Licensed under Apache License 2.0
@@ -33,15 +36,10 @@ public class PieChartDataSet: ChartDataSet, IPieChartDataSet
         initialize()
     }
     
-    public override init(values: [ChartDataEntry]?, label: String?)
+    public override init(yVals: [ChartDataEntry]?, label: String?)
     {
-        super.init(values: values, label: label)
+        super.init(yVals: yVals, label: label)
         initialize()
-    }
-    
-    internal override func calcMinMax(entry e: ChartDataEntry)
-    {
-        calcMinMaxY(entry: e)
     }
     
     // MARK: - Styling functions and accessors

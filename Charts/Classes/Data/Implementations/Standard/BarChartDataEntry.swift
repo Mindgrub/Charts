@@ -2,6 +2,8 @@
 //  BarChartDataEntry.swift
 //  Charts
 //
+//  Created by Daniel Cohen Gindi on 4/3/15.
+//
 //  Copyright 2015 Daniel Cohen Gindi & Philipp Jahoda
 //  A port of MPAndroidChart for iOS
 //  Licensed under Apache License 2.0
@@ -14,10 +16,7 @@ import Foundation
 public class BarChartDataEntry: ChartDataEntry
 {
     /// the values the stacked barchart holds
-    private var _yVals: [Double]?
-    
-    /// the ranges for the individual stack values - automatically calculated
-    private var _ranges: [Range]?
+    private var _values: [Double]?
     
     /// the sum of all negative values this entry (if stacked) contains
     private var _negativeSum: Double = 0.0
@@ -31,61 +30,58 @@ public class BarChartDataEntry: ChartDataEntry
     }
     
     /// Constructor for stacked bar entries.
-    public init(x: Double, yValues: [Double])
+    public init(values: [Double], xIndex: Int)
     {
-        super.init(x: x, y: BarChartDataEntry.calcSum(yValues))
-        self._yVals = yValues
-        calcRanges()
+        super.init(value: BarChartDataEntry.calcSum(values), xIndex: xIndex)
+        self.values = values
         calcPosNegSum()
     }
     
     /// Constructor for normal bars (not stacked).
-    public override init(x: Double, y: Double)
+    public override init(value: Double, xIndex: Int)
     {
-        super.init(x: x, y: y)
+        super.init(value: value, xIndex: xIndex)
     }
     
     /// Constructor for stacked bar entries.
-    public init(x: Double, yValues: [Double], label: String)
+    public init(values: [Double], xIndex: Int, label: String)
     {
-        super.init(x: x, y: BarChartDataEntry.calcSum(yValues), data: label)
-        self._yVals = yValues
-        calcRanges()
-        calcPosNegSum()
+        super.init(value: BarChartDataEntry.calcSum(values), xIndex: xIndex, data: label)
+        self.values = values
     }
     
     /// Constructor for normal bars (not stacked).
-    public override init(x: Double, y: Double, data: AnyObject?)
+    public override init(value: Double, xIndex: Int, data: AnyObject?)
     {
-        super.init(x: x, y: y, data: data)
+        super.init(value: value, xIndex: xIndex, data: data)
     }
     
     public func getBelowSum(stackIndex :Int) -> Double
     {
-        if (_yVals == nil)
+        if (values == nil)
         {
             return 0
         }
         
         var remainder: Double = 0.0
-        var index = _yVals!.count - 1
+        var index = values!.count - 1
         
         while (index > stackIndex && index >= 0)
         {
-            remainder += _yVals![index]
+            remainder += values![index]
             index -= 1
         }
         
         return remainder
     }
     
-    /// - returns: The sum of all negative values this entry (if stacked) contains. (this is a positive number)
+    /// - returns: the sum of all negative values this entry (if stacked) contains. (this is a positive number)
     public var negativeSum: Double
     {
         return _negativeSum
     }
     
-    /// - returns: The sum of all positive values this entry (if stacked) contains.
+    /// - returns: the sum of all positive values this entry (if stacked) contains.
     public var positiveSum: Double
     {
         return _positiveSum
@@ -93,7 +89,7 @@ public class BarChartDataEntry: ChartDataEntry
 
     public func calcPosNegSum()
     {
-        if _yVals == nil
+        if _values == nil
         {
             _positiveSum = 0.0
             _negativeSum = 0.0
@@ -103,7 +99,7 @@ public class BarChartDataEntry: ChartDataEntry
         var sumNeg: Double = 0.0
         var sumPos: Double = 0.0
         
-        for f in _yVals!
+        for f in _values!
         {
             if f < 0.0
             {
@@ -118,71 +114,22 @@ public class BarChartDataEntry: ChartDataEntry
         _negativeSum = sumNeg
         _positiveSum = sumPos
     }
-    
-    /// Splits up the stack-values of the given bar-entry into Range objects.
-    /// - parameter entry:
-    /// - returns:
-    public func calcRanges()
-    {
-        let values = yValues
-        if values?.isEmpty != false
-        {
-            return
-        }
-        
-        if _ranges == nil
-        {
-            _ranges = [Range]()
-        }
-        else
-        {
-            _ranges?.removeAll()
-        }
-        
-        _ranges?.reserveCapacity(values!.count)
-        
-        var negRemain = -negativeSum
-        var posRemain: Double = 0.0
-        
-        for i in 0 ..< values!.count
-        {
-            let value = values![i]
-            
-            if value < 0
-            {
-                _ranges?.append(Range(from: negRemain, to: negRemain + abs(value)))
-                negRemain += abs(value)
-            }
-            else
-            {
-                _ranges?.append(Range(from: posRemain, to: posRemain+value))
-                posRemain += value
-            }
-        }
-    }
-    
+
     // MARK: Accessors
     
     /// the values the stacked barchart holds
-    public var isStacked: Bool { return _yVals != nil }
+    public var isStacked: Bool { return _values != nil }
     
     /// the values the stacked barchart holds
-    public var yValues: [Double]?
+    public var values: [Double]?
     {
-        get { return self._yVals }
+        get { return self._values }
         set
         {
-            self.y = BarChartDataEntry.calcSum(newValue)
-            self._yVals = newValue
-            calcRanges()
+            self.value = BarChartDataEntry.calcSum(newValue)
+            self._values = newValue
             calcPosNegSum()
         }
-    }
-    
-    /// - returns: The ranges of the individual stack-entries. Will return null if this entry is not stacked.
-    public var ranges: [Range]?
-    {
-        return _ranges
     }
     
     // MARK: NSCopying
@@ -190,8 +137,8 @@ public class BarChartDataEntry: ChartDataEntry
     public override func copyWithZone(zone: NSZone) -> AnyObject
     {
         let copy = super.copyWithZone(zone) as! BarChartDataEntry
-        copy._yVals = _yVals
-        copy.y = y
+        copy._values = _values
+        copy.value = value
         copy._negativeSum = _negativeSum
         return copy
     }
